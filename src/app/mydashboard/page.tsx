@@ -1,0 +1,2290 @@
+"use client";
+
+import { useState } from "react";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SiteHeader } from "@/components/site-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+import { breweryLocations } from "./data";
+import {
+  ArrowUp,
+  ArrowDown,
+  AlertCircle,
+  Info,
+  Clock,
+  AlertTriangle,
+  Bell,
+  MapPin,
+  Map as MapIcon,
+  Layers as LayersIcon,
+  Filter,
+  Calendar,
+  Maximize2,
+  ChevronRight,
+  Search,
+  BarChart2,
+  PieChart as PieChartIcon,
+  TrendingUp,
+  RefreshCw,
+  Truck,
+  AlertOctagon,
+  Layers,
+  Repeat,
+  Check,
+  X,
+  History,
+  Activity,
+  BadgePlus,
+  CircleDashed,
+  ExternalLink,
+  Milestone,
+  BoxSelect,
+  ShieldAlert,
+  UserCog,
+  MoreHorizontal,
+  Timer,
+  Radio,
+  Download
+} from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line
+} from "recharts";
+
+// Import dummy data
+import {
+  planningKPIs,
+  appointmentKPIs,
+  breweryData,
+  alertsData,
+  barChartData,
+  rejectionData,
+  tripClassificationData,
+  tripClassificationTrends,
+  stackedBarData,
+  etaBreachData,
+  carrierResponseData,
+  planningTimeline,
+  rejectionResolution,
+  reminderEscalationData,
+  carrierPerformanceData,
+  timeSeriesData
+} from "./data";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+
+// Modern Stat Card Component
+const StatCard = ({ title, value, trend, percent, description, icon: Icon }: any) => (
+  <Card className="overflow-hidden border bg-gradient-to-b from-background to-muted/30 shadow-sm hover:shadow-md transition-shadow">
+    <CardHeader className="pb-2 flex flex-row justify-between items-start">
+      <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      {Icon && <Icon className="h-4 w-4 text-muted-foreground opacity-70" />}
+    </CardHeader>
+    <CardContent>
+      <div className="flex items-center justify-between">
+        <div className="text-2xl font-bold">{percent ? `${value}%` : value}</div>
+        {trend && (
+          <div
+            className={`flex items-center px-2 py-1 rounded-md ${
+              trend === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+            }`}
+          >
+            {trend === "up" ? <ArrowUp className="h-3.5 w-3.5 mr-1" /> : <ArrowDown className="h-3.5 w-3.5 mr-1" />}
+            <span className="text-xs font-medium">2.5%</span>
+          </div>
+        )}
+      </div>
+      {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+    </CardContent>
+  </Card>
+);
+
+// Modern Alert Component
+const AlertItem = ({ type, message, time }: any) => {
+  let icon;
+  let styles;
+
+  switch (type) {
+    case "warning":
+      icon = <AlertCircle className="h-4 w-4 mr-2" />;
+      styles = "bg-yellow-50 border-yellow-200 text-yellow-800 [&_svg]:text-yellow-500";
+      break;
+    case "danger":
+      icon = <AlertTriangle className="h-4 w-4 mr-2" />;
+      styles = "bg-red-50 border-red-200 text-red-800 [&_svg]:text-red-500";
+      break;
+    case "info":
+      icon = <Info className="h-4 w-4 mr-2" />;
+      styles = "bg-blue-50 border-blue-200 text-blue-800 [&_svg]:text-blue-500";
+      break;
+    default:
+      icon = <Info className="h-4 w-4 mr-2" />;
+      styles = "bg-gray-50 border-gray-200 text-gray-800 [&_svg]:text-gray-500";
+  }
+
+  return (
+    <div className={`p-3 mb-2 rounded-md border shadow-sm transition-all hover:shadow-md ${styles}`}>
+      <div className="flex items-center">
+        {icon}
+        <div className="flex-1">
+          <p className="text-sm font-medium">{message}</p>
+          <div className="flex items-center mt-1 text-xs opacity-80">
+            <Clock className="h-3 w-3 mr-1" />
+            <span>{time}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Map View removed to save space
+
+export default function Page() {
+  // State for filter and interactive elements
+  const [dateFilter, setDateFilter] = useState<string>("today");
+  const [timeRangeFilter, setTimeRangeFilter] = useState<string>("all");
+  const [breweryFilter, setBreweryFilter] = useState<string>("all");
+
+  const [carrierFilter, setCarrierFilter] = useState<string>("all");
+  const [showRealTimeUpdates, setShowRealTimeUpdates] = useState<boolean>(true);
+  const [selectedFolio, setSelectedFolio] = useState<any>(null);
+  const [selectedCarrier, setSelectedCarrier] = useState<any>(null);
+  const [selectedBrewery, setSelectedBrewery] = useState<any>(null);
+  const [expandedView, setExpandedView] = useState<string>("");
+  const [chartType, setChartType] = useState<string>("bar");
+
+  // Function to handle drill-down on folio
+  const handleFolioSelect = (folio: any) => {
+    setSelectedFolio(folio);
+  };
+
+  // Function to handle drill-down on carrier
+  const handleCarrierSelect = (carrier: any) => {
+    setSelectedCarrier(carrier);
+  };
+
+  // Function to handle drill-down on brewery
+  const handleBrewerySelect = (brewery: any) => {
+    setSelectedBrewery(brewery);
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setDateFilter("today");
+    setTimeRangeFilter("all");
+    setBreweryFilter("all");
+    setCarrierFilter("all");
+    setSelectedFolio(null);
+    setSelectedCarrier(null);
+    setSelectedBrewery(null);
+    setExpandedView("");
+  };
+
+  return (
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 52)",
+          "--header-height": "calc(var(--spacing) * 12)"
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="flex flex-1 flex-col">
+          <div className="@container/main flex flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-4 py-2 md:gap-6 md:py-6">
+              {/* Header with Global Metrics Summary */}
+              <div className="px-4 lg:px-6">
+                {/* Modern Filter Bar */}
+                <div className="mb-4 flex flex-col gap-4">
+                  <div className="flex flex-wrap gap-3 items-center bg-muted/40 p-3 rounded-lg">
+                    <div className="flex gap-2">
+                      <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-[130px] bg-background">
+                          <Calendar className="h-4 w-4 mr-1.5" />
+                          <SelectValue placeholder="Date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="yesterday">Yesterday</SelectItem>
+                          <SelectItem value="last3days">Last 3 Days</SelectItem>
+                          <SelectItem value="thisWeek">This Week</SelectItem>
+                          <SelectItem value="lastWeek">Last Week</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={timeRangeFilter} onValueChange={setTimeRangeFilter}>
+                        <SelectTrigger className="w-[130px] bg-background">
+                          <Clock className="h-4 w-4 mr-1.5" />
+                          <SelectValue placeholder="Time" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Times</SelectItem>
+                          <SelectItem value="before3pm">Before 3 PM</SelectItem>
+                          <SelectItem value="3pmTo4pm">3 PM - 4 PM</SelectItem>
+                          <SelectItem value="after6pm">After 6 PM</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Select value={breweryFilter} onValueChange={setBreweryFilter}>
+                        <SelectTrigger className="w-[150px] bg-background">
+                          <Layers className="h-4 w-4 mr-1.5" />
+                          <SelectValue placeholder="Brewery" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Breweries</SelectItem>
+                          {breweryData.map((brewery, index) => (
+                            <SelectItem key={index} value={brewery.name}>
+                              {brewery.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={carrierFilter} onValueChange={setCarrierFilter}>
+                        <SelectTrigger className="w-[150px] bg-background">
+                          <Truck className="h-4 w-4 mr-1.5" />
+                          <SelectValue placeholder="Carrier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Carriers</SelectItem>
+                          {carrierPerformanceData.map((carrier, index) => (
+                            <SelectItem key={index} value={carrier.name}>
+                              {carrier.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Button variant="default" size="sm" className="ml-auto">
+                      <Filter className="h-3.5 w-3.5 mr-1.5" />
+                      Apply Filters
+                    </Button>
+                  </div>
+                </div>
+                {/* Main Content Area - Split into Main Content and Sidebar */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  {/* Main Content Area (75%) */}
+                  <div className="lg:col-span-3">
+                    <Tabs defaultValue="dashboard" className="w-full">
+                      <div className="flex items-center justify-between mb-4">
+                        <TabsList className="w-full sm:w-auto bg-muted/40 p-1">
+                          <TabsTrigger value="dashboard">Overview</TabsTrigger>
+                          <TabsTrigger value="planning">SAP-DeltaX Folios</TabsTrigger>
+                          <TabsTrigger value="rejection">Carrier Rejections</TabsTrigger>
+                          <TabsTrigger value="classification">Trip Classification</TabsTrigger>
+                          <TabsTrigger value="tracking">Folio Tracking</TabsTrigger>
+                          <TabsTrigger value="appointment">Appointments</TabsTrigger>
+                        </TabsList>
+                        <Button variant="outline" size="sm" className="hidden md:flex items-center gap-1">
+                          <Download className="h-3.5 w-3.5" />
+                          <span>Export Data</span>
+                        </Button>
+                      </div>
+
+                      {/* Critical Alerts Dashboard */}
+                      <TabsContent value="dashboard" className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-semibold">Critical Alerts Dashboard</h2>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="border-red-500 text-red-500">
+                              <AlertOctagon className="h-3 w-3 mr-1" />
+                              {alertsData.filter((a) => a.type === "Critical").length} Critical
+                            </Badge>
+                            <Badge variant="outline" className="border-amber-500 text-amber-500">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              {alertsData.filter((a) => a.type === "High").length} High
+                            </Badge>
+                            <Button variant="ghost" size="sm" className="gap-1">
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Refresh
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Critical Alerts Summary Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <Card className="bg-red-50 border-red-200">
+                            <CardContent className="p-4 flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="p-2 bg-red-100 rounded-full mr-3">
+                                  <AlertCircle className="h-5 w-5 text-red-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">After 4PM Rejections</p>
+                                  <p className="text-2xl font-bold">{planningKPIs.foliosRejectedAfter4PM}</p>
+                                </div>
+                              </div>
+                              <Button size="sm" variant="secondary" className="h-8">
+                                Action
+                              </Button>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="bg-amber-50 border-amber-200">
+                            <CardContent className="p-4 flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="p-2 bg-amber-100 rounded-full mr-3">
+                                  <Clock className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Pending Plates (2hrs)</p>
+                                  <p className="text-2xl font-bold">{appointmentKPIs.pendingPlate2Hrs}</p>
+                                </div>
+                              </div>
+                              <Button size="sm" variant="secondary" className="h-8">
+                                Action
+                              </Button>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="bg-blue-50 border-blue-200">
+                            <CardContent className="p-4 flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="p-2 bg-blue-100 rounded-full mr-3">
+                                  <AlertOctagon className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Mismatches</p>
+                                  <p className="text-2xl font-bold">{planningKPIs.sapDeltaxMismatches}</p>
+                                </div>
+                              </div>
+                              <Button size="sm" variant="secondary" className="h-8">
+                                Action
+                              </Button>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="bg-purple-50 border-purple-200">
+                            <CardContent className="p-4 flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="p-2 bg-purple-100 rounded-full mr-3">
+                                  <Bell className="h-5 w-5 text-purple-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Escalations</p>
+                                  <p className="text-2xl font-bold">{planningKPIs.escalationsTriggered}</p>
+                                </div>
+                              </div>
+                              <Button size="sm" variant="secondary" className="h-8">
+                                Action
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        {/* Actions Required */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base font-medium">Actions Required</CardTitle>
+                            <CardDescription>Tasks that need immediate attention</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Priority</TableHead>
+                                  <TableHead>Task</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Deadline</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell>
+                                    <Badge variant="destructive">Critical</Badge>
+                                  </TableCell>
+                                  <TableCell className="font-medium">Resolve After-4PM Rejections</TableCell>
+                                  <TableCell>Carrier Response</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center">
+                                      <Clock className="h-3.5 w-3.5 mr-1 text-red-500" />
+                                      <span>3:30 PM Today</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="border-red-500 text-red-500">
+                                      Urgent
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button size="sm">Resolve</Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>
+                                    <Badge variant="destructive">Critical</Badge>
+                                  </TableCell>
+                                  <TableCell className="font-medium">Address Missing Plates</TableCell>
+                                  <TableCell>Vehicle Assignment</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center">
+                                      <Clock className="h-3.5 w-3.5 mr-1 text-red-500" />
+                                      <span>4:00 PM Today</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="border-red-500 text-red-500">
+                                      Overdue
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button size="sm">Resolve</Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>
+                                    <Badge>High</Badge>
+                                  </TableCell>
+                                  <TableCell className="font-medium">Reconcile SAP vs DeltaX Mismatches</TableCell>
+                                  <TableCell>System Integration</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center">
+                                      <Clock className="h-3.5 w-3.5 mr-1 text-amber-500" />
+                                      <span>5:00 PM Today</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="border-amber-500 text-amber-500">
+                                      Pending
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button size="sm">Resolve</Button>
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </CardContent>
+                          <CardFooter className="border-t pt-4">
+                            <Button className="w-full">View All Tasks</Button>
+                          </CardFooter>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Planning Module KPIs */}
+                      <TabsContent value="planning" className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Load Plans Checked vs Pending */}
+                          <Card className="shadow-sm col-span-2">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                              <CardTitle className="text-sm font-medium">DeltaX Folio Status at 3 PM</CardTitle>
+                              <Badge variant={planningKPIs.folioPercentage > 80 ? "secondary" : "destructive"}>
+                                {planningKPIs.folioPercentage}% Updated
+                              </Badge>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={barChartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="Checked" fill="#8884d8" />
+                                    <Bar dataKey="Pending" fill="#82ca9d" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* SAP vs DeltaX mismatches */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">SAP vs DeltaX Folio Reconciliation</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex flex-col h-[250px]">
+                                <div className="flex flex-col items-center mb-4">
+                                  <div className="text-4xl font-bold text-red-500">
+                                    {planningKPIs.sapDeltaxMismatches}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-2">Total Mismatches</div>
+                                </div>
+
+                                <div className="border rounded-md p-4 mt-2">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm font-medium">Reminders Sent</span>
+                                    <span className="text-sm">{reminderEscalationData.reconciliation.reminders}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm font-medium">Escalations Triggered</span>
+                                    <Badge variant="destructive">
+                                      {reminderEscalationData.reconciliation.escalations}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium">Resolution Time</span>
+                                    <span className="text-sm">45 mins (avg)</span>
+                                  </div>
+                                </div>
+
+                                <div className="w-full mt-4">
+                                  <ResponsiveContainer width="100%" height={80}>
+                                    <LineChart
+                                      data={[
+                                        { name: "Mon", value: 3 },
+                                        { name: "Tue", value: 2 },
+                                        { name: "Wed", value: 5 },
+                                        { name: "Thu", value: 3 },
+                                        { name: "Fri", value: 2 }
+                                      ]}
+                                    >
+                                      <Line
+                                        type="monotone"
+                                        dataKey="value"
+                                        stroke="#ff0000"
+                                        strokeWidth={2}
+                                        dot={false}
+                                      />
+                                    </LineChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Rejections Before & After 4 PM */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">Rejections Before & After 4 PM</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={rejectionData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="value" fill="#8884d8" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Trip Classification */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">Trip Classification</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={tripClassificationData}
+                                      cx="50%"
+                                      cy="50%"
+                                      outerRadius={60}
+                                      fill="#8884d8"
+                                      dataKey="value"
+                                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                      {tripClassificationData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Adjusted Folios & Rescheduled */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">Adjusted Folios & Rescheduled</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={stackedBarData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="value" fill="#8884d8">
+                                      {stackedBarData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Bar>
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      {/* Carrier Rejections & Resolution Tab */}
+                      <TabsContent value="rejection" className="space-y-6">
+                        <Card className="shadow-sm">
+                          <CardHeader>
+                            <CardTitle className="text-base font-medium">Carrier Rejection Resolution</CardTitle>
+                            <CardDescription>
+                              Critical focus on rejections after 4PM (auto reassignment)
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="mb-4 flex items-center justify-between">
+                              <div className="flex items-center space-x-4">
+                                <div className="flex items-center">
+                                  <div className="h-3 w-3 rounded-full bg-red-500 mr-1"></div>
+                                  <span className="text-sm">After 4PM</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <div className="h-3 w-3 rounded-full bg-amber-500 mr-1"></div>
+                                  <span className="text-sm">Before 4PM</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <div className="h-3 w-3 rounded-full bg-green-500 mr-1"></div>
+                                  <span className="text-sm">Resolved</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm">
+                                  <Filter className="h-3 w-3 mr-1" />
+                                  Filter
+                                </Button>
+                                <Select defaultValue="brewery">
+                                  <SelectTrigger className="w-[150px] h-8 text-xs">
+                                    <SelectValue placeholder="Group by" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="brewery">Group by Brewery</SelectItem>
+                                    <SelectItem value="carrier">Group by Carrier</SelectItem>
+                                    <SelectItem value="time">Group by Time</SelectItem>
+                                    <SelectItem value="status">Group by Status</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Folio ID</TableHead>
+                                  <TableHead>Brewery</TableHead>
+                                  <TableHead>Carrier</TableHead>
+                                  <TableHead>Rejection Time</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Reason</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Action</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {rejectionResolution.map((plan) => (
+                                  <TableRow
+                                    key={plan.id}
+                                    // className={selectedFolio?.id === plan.id ? "bg-muted" : ""}
+                                  >
+                                    <TableCell className="font-medium">{plan.folioId}</TableCell>
+                                    <TableCell>{plan.brewery}</TableCell>
+                                    <TableCell>{plan.carrier}</TableCell>
+                                    <TableCell>{plan.rejectionTime}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={plan.type === "Before 4PM" ? "outline" : "destructive"}>
+                                        {plan.type}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="max-w-[150px] truncate">{plan.rejectionReason}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={plan.status === "Resolved" ? "secondary" : "outline"}>
+                                        {plan.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Dialog>
+                                        <DialogTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 px-2"
+                                            onClick={() => handleFolioSelect(plan)}
+                                          >
+                                            <Search className="h-3.5 w-3.5 mr-1" />
+                                            Details
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-3xl">
+                                          <DialogHeader>
+                                            <DialogTitle>Folio Details: {plan.folioId}</DialogTitle>
+                                            <DialogDescription>
+                                              Detailed information about this folio rejection and resolution
+                                            </DialogDescription>
+                                          </DialogHeader>
+
+                                          <div className="grid grid-cols-2 gap-4 py-4">
+                                            <div className="space-y-2">
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Brewery:</span>
+                                                <span>{plan.brewery}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Carrier:</span>
+                                                <span>{plan.carrier}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Rejection Time:</span>
+                                                <span>{plan.rejectionTime}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Rejection Type:</span>
+                                                <Badge variant={plan.type === "Before 4PM" ? "outline" : "destructive"}>
+                                                  {plan.type}
+                                                </Badge>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Rejection Reason:</span>
+                                                <span>{plan.rejectionReason}</span>
+                                              </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Resolution Status:</span>
+                                                <Badge
+                                                  variant={plan.status === "Resolved" ? "secondary" : "destructive"}
+                                                >
+                                                  {plan.status}
+                                                </Badge>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Resolved By:</span>
+                                                <span>{plan.resolvedBy}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Resolution Time:</span>
+                                                <span>{plan.resolvedAt}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Reminders Sent:</span>
+                                                <span>{plan.reminders}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="font-medium">Auto-reassigned:</span>
+                                                <span>{plan.autoReassigned ? "Yes" : "No"}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="border-t pt-4 mt-2">
+                                            <h4 className="font-semibold mb-2">Schedule Changes</h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                              <div className="border rounded-md p-3">
+                                                <p className="text-sm font-medium text-muted-foreground mb-2">
+                                                  Original Schedule
+                                                </p>
+                                                <p className="font-medium">{plan.originalSchedule}</p>
+                                              </div>
+                                              <div className="border rounded-md p-3">
+                                                <p className="text-sm font-medium text-muted-foreground mb-2">
+                                                  New Schedule
+                                                </p>
+                                                <p className="font-medium">{plan.newSchedule}</p>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex justify-end gap-2 mt-4">
+                                            <Button variant="outline">View Timeline</Button>
+                                            <Button>View All Actions</Button>
+                                          </div>
+                                        </DialogContent>
+                                      </Dialog>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </CardContent>
+                          <CardFooter className="flex justify-between border-t pt-4">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Info className="h-4 w-4" />
+                              <p>Showing {rejectionResolution.length} folio rejections</p>
+                            </div>
+                            <Button variant="outline" size="sm">
+                              <ChevronRight className="h-4 w-4 mr-1" /> Export Data
+                            </Button>
+                          </CardFooter>
+                        </Card>
+
+                        <Card className="shadow-sm">
+                          <CardHeader>
+                            <CardTitle className="text-base font-medium">Carrier Performance Analysis</CardTitle>
+                            <CardDescription>Detailed performance metrics for carriers handling folios</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Carrier</TableHead>
+                                  <TableHead>Acceptance Rate</TableHead>
+                                  <TableHead>Avg Response Time</TableHead>
+                                  <TableHead>Rejections</TableHead>
+                                  <TableHead>ETA Compliance</TableHead>
+                                  <TableHead>Plate Assignment</TableHead>
+                                  <TableHead>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {carrierPerformanceData.map((carrier, index) => (
+                                  <TableRow
+                                    key={index}
+                                    className={selectedCarrier?.name === carrier.name ? "bg-muted" : ""}
+                                  >
+                                    <TableCell className="font-medium">{carrier.name}</TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center">
+                                        <div className="w-16 h-2 rounded-full bg-gray-200 mr-2">
+                                          <div
+                                            className={`h-full rounded-full ${
+                                              carrier.acceptanceRate > 90
+                                                ? "bg-green-500"
+                                                : carrier.acceptanceRate > 75
+                                                ? "bg-yellow-500"
+                                                : "bg-red-500"
+                                            }`}
+                                            style={{ width: `${carrier.acceptanceRate}%` }}
+                                          />
+                                        </div>
+                                        <span>{carrier.acceptanceRate}%</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={carrier.responseTime < 30 ? "secondary" : "outline"}>
+                                        {carrier.responseTime} mins
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-1">
+                                        <Badge variant="outline">B: {carrier.rejections.before4PM}</Badge>
+                                        <Badge variant="destructive">A: {carrier.rejections.after4PM}</Badge>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center">
+                                        <div className="w-16 h-2 rounded-full bg-gray-200 mr-2">
+                                          <div
+                                            className={`h-full rounded-full ${
+                                              carrier.etaComplianceRate > 95
+                                                ? "bg-green-500"
+                                                : carrier.etaComplianceRate > 85
+                                                ? "bg-yellow-500"
+                                                : "bg-red-500"
+                                            }`}
+                                            style={{ width: `${carrier.etaComplianceRate}%` }}
+                                          />
+                                        </div>
+                                        <span>{carrier.etaComplianceRate}%</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={carrier.assignedPlates / 200 > 0.9 ? "secondary" : "outline"}>
+                                        {carrier.assignedPlates}/{carrier.totalFolios}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Dialog>
+                                        <DialogTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 px-2"
+                                            onClick={() => handleCarrierSelect(carrier)}
+                                          >
+                                            <BarChart2 className="h-3.5 w-3.5 mr-1" />
+                                            Analytics
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-3xl">
+                                          <DialogHeader>
+                                            <DialogTitle>Carrier Performance: {carrier.name}</DialogTitle>
+                                            <DialogDescription>
+                                              Detailed performance metrics and trend analysis
+                                            </DialogDescription>
+                                          </DialogHeader>
+
+                                          <div className="grid grid-cols-2 gap-4 py-4">
+                                            <Card>
+                                              <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm">Acceptance Rate Trend</CardTitle>
+                                              </CardHeader>
+                                              <CardContent>
+                                                <div className="h-[200px]">
+                                                  <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart
+                                                      data={[
+                                                        { date: "Mon", rate: 85 },
+                                                        { date: "Tue", rate: 88 },
+                                                        { date: "Wed", rate: 82 },
+                                                        { date: "Thu", rate: 90 },
+                                                        { date: "Fri", rate: carrier.acceptanceRate }
+                                                      ]}
+                                                    >
+                                                      <CartesianGrid strokeDasharray="3 3" />
+                                                      <XAxis dataKey="date" />
+                                                      <YAxis domain={[70, 100]} />
+                                                      <Tooltip />
+                                                      <Line
+                                                        type="monotone"
+                                                        dataKey="rate"
+                                                        stroke="#8884d8"
+                                                        activeDot={{ r: 8 }}
+                                                      />
+                                                    </LineChart>
+                                                  </ResponsiveContainer>
+                                                </div>
+                                              </CardContent>
+                                            </Card>
+
+                                            <Card>
+                                              <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm">Rejection Distribution</CardTitle>
+                                              </CardHeader>
+                                              <CardContent>
+                                                <div className="h-[200px]">
+                                                  <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                      <Pie
+                                                        data={[
+                                                          {
+                                                            name: "Before 4PM",
+                                                            value: carrier.rejections.before4PM,
+                                                            color: "#facc15"
+                                                          },
+                                                          {
+                                                            name: "After 4PM",
+                                                            value: carrier.rejections.after4PM,
+                                                            color: "#ef4444"
+                                                          }
+                                                        ]}
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={40}
+                                                        outerRadius={60}
+                                                        fill="#8884d8"
+                                                        dataKey="value"
+                                                        label
+                                                      >
+                                                        {[0, 1].map((entry, index) => (
+                                                          <Cell
+                                                            key={`cell-${index}`}
+                                                            fill={index === 0 ? "#facc15" : "#ef4444"}
+                                                          />
+                                                        ))}
+                                                      </Pie>
+                                                      <Tooltip />
+                                                      <Legend />
+                                                    </PieChart>
+                                                  </ResponsiveContainer>
+                                                </div>
+                                              </CardContent>
+                                            </Card>
+                                          </div>
+
+                                          <div className="border-t pt-4">
+                                            <h4 className="font-semibold mb-2">Performance Summary</h4>
+                                            <div className="grid grid-cols-3 gap-4">
+                                              <div className="border rounded-md p-3 text-center">
+                                                <p className="text-sm font-medium text-muted-foreground mb-1">
+                                                  Avg Response Time
+                                                </p>
+                                                <p className="font-medium text-lg">{carrier.responseTime} mins</p>
+                                              </div>
+                                              <div className="border rounded-md p-3 text-center">
+                                                <p className="text-sm font-medium text-muted-foreground mb-1">
+                                                  ETA Compliance
+                                                </p>
+                                                <p className="font-medium text-lg">{carrier.etaComplianceRate}%</p>
+                                              </div>
+                                              <div className="border rounded-md p-3 text-center">
+                                                <p className="text-sm font-medium text-muted-foreground mb-1">
+                                                  Plate Assignment
+                                                </p>
+                                                <p className="font-medium text-lg">
+                                                  {Math.round((carrier.assignedPlates / 200) * 100)}%
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </DialogContent>
+                                      </Dialog>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </CardContent>
+                        </Card>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Rejections Before & After 4 PM - Weekly Trend */}
+                          <Card className="shadow-sm">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                              <CardTitle className="text-sm font-medium">Weekly Rejection Trends</CardTitle>
+                              <Button variant="outline" size="sm">
+                                <Maximize2 className="h-4 w-4 mr-1" /> Expand
+                              </Button>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[230px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart
+                                    data={[
+                                      {
+                                        name: "Mon",
+                                        before4PM: timeSeriesData.rejectionTrends.monday.before4PM,
+                                        after4PM: timeSeriesData.rejectionTrends.monday.after4PM
+                                      },
+                                      {
+                                        name: "Tue",
+                                        before4PM: timeSeriesData.rejectionTrends.tuesday.before4PM,
+                                        after4PM: timeSeriesData.rejectionTrends.tuesday.after4PM
+                                      },
+                                      {
+                                        name: "Wed",
+                                        before4PM: timeSeriesData.rejectionTrends.wednesday.before4PM,
+                                        after4PM: timeSeriesData.rejectionTrends.wednesday.after4PM
+                                      },
+                                      {
+                                        name: "Thu",
+                                        before4PM: timeSeriesData.rejectionTrends.thursday.before4PM,
+                                        after4PM: timeSeriesData.rejectionTrends.thursday.after4PM
+                                      },
+                                      {
+                                        name: "Fri",
+                                        before4PM: timeSeriesData.rejectionTrends.friday.before4PM,
+                                        after4PM: timeSeriesData.rejectionTrends.friday.after4PM
+                                      }
+                                    ]}
+                                  >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="before4PM" name="Before 4PM" fill="#facc15" />
+                                    <Bar dataKey="after4PM" name="After 4PM" fill="#ef4444" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                              <div className="mt-4 pt-4 border-t">
+                                <h4 className="text-sm font-medium mb-2">Resolution Protocol:</h4>
+                                <ul className="text-xs space-y-1">
+                                  <li>• Before 4PM: Manual reassignment with 15-min reminders</li>
+                                  <li>• Auto reassignment after 4 reminders</li>
+                                  <li>• After 4PM: Immediate auto reassignment</li>
+                                </ul>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Time-based Acceptance Rate */}
+                          <Card className="shadow-sm">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                              <CardTitle className="text-sm font-medium">Carrier Acceptance Rate Over Time</CardTitle>
+                              <Button variant="outline" size="sm">
+                                <Maximize2 className="h-4 w-4 mr-1" /> Expand
+                              </Button>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[230px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={timeSeriesData.acceptanceRate}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="time" />
+                                    <YAxis domain={[0, 100]} />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Line
+                                      type="monotone"
+                                      name="Acceptance Rate (%)"
+                                      dataKey="rate"
+                                      stroke="#3b82f6"
+                                      strokeWidth={2}
+                                      dot={{ fill: "#3b82f6", r: 4 }}
+                                      activeDot={{ r: 6 }}
+                                    />
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      {/* Trip Classification Tab */}
+                      <TabsContent value="classification" className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <Card className="shadow-sm md:col-span-2">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                              <div>
+                                <CardTitle className="text-base font-medium">
+                                  Trip Classification Distribution
+                                </CardTitle>
+                                <CardDescription>Based on the provided field combination logic</CardDescription>
+                              </div>
+                              <ToggleGroup type="single" defaultValue="pie">
+                                <ToggleGroupItem value="pie">
+                                  <PieChartIcon className="h-4 w-4" />
+                                </ToggleGroupItem>
+                                <ToggleGroupItem value="bar">
+                                  <BarChart2 className="h-4 w-4" />
+                                </ToggleGroupItem>
+                              </ToggleGroup>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={tripClassificationData}
+                                      cx="50%"
+                                      cy="50%"
+                                      outerRadius={120}
+                                      fill="#8884d8"
+                                      dataKey="value"
+                                      label={({ name, value, percent }) =>
+                                        `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
+                                      }
+                                    >
+                                      {tripClassificationData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip formatter={(value, name) => [`${value} Load Plans`, `${name} Trips`]} />
+                                    <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                              <div className="grid grid-cols-3 gap-4 mt-6">
+                                {tripClassificationData.map((type, index) => (
+                                  <Card key={index} className="overflow-hidden">
+                                    <div className="h-1.5 w-full" style={{ backgroundColor: type.color }}></div>
+                                    <CardContent className="pt-4">
+                                      <div className="text-center">
+                                        <h3 className="text-xl font-bold">{type.value}</h3>
+                                        <p className="text-sm text-muted-foreground">{type.name} Trips</p>
+                                        <Badge
+                                          variant="outline"
+                                          className="mt-2"
+                                          style={{ borderColor: type.color, color: type.color }}
+                                        >
+                                          {Math.round((type.value / planningKPIs.totalFolios) * 100)}%
+                                        </Badge>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base font-medium">Trip Classification Logic</CardTitle>
+                              <CardDescription>Field combinations as per Miro board</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-4">
+                                <div className="border p-3 rounded-md relative overflow-hidden">
+                                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                                  <h5 className="text-sm font-medium text-blue-500 mb-1 pl-2">Regular Trip</h5>
+                                  <p className="text-xs text-muted-foreground pl-2">
+                                    Standard trip based on default routing parameters with no special handling.
+                                  </p>
+
+                                  <div className="mt-2 pt-2 border-t border-dashed pl-2">
+                                    <p className="text-xs font-medium">Field Combinations:</p>
+                                    <ul className="text-xs text-muted-foreground list-disc pl-4 mt-1">
+                                      <li>Default parameters</li>
+                                      <li>Standard routing</li>
+                                      <li>No uncoupling flags</li>
+                                    </ul>
+                                  </div>
+                                </div>
+                                <div className="border p-3 rounded-md relative overflow-hidden">
+                                  <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                                  <h5 className="text-sm font-medium text-green-500 mb-1 pl-2">Short Trip</h5>
+                                  <p className="text-xs text-muted-foreground pl-2">
+                                    Trips with distance under threshold defined in Miro board logic.
+                                  </p>
+
+                                  <div className="mt-2 pt-2 border-t border-dashed pl-2">
+                                    <p className="text-xs font-medium">Field Combinations:</p>
+                                    <ul className="text-xs text-muted-foreground list-disc pl-4 mt-1">
+                                      <li>Distance &lt; 50 km</li>
+                                      <li>Single drop location</li>
+                                      <li>Same-day delivery</li>
+                                    </ul>
+                                  </div>
+                                </div>
+                                <div className="border p-3 rounded-md relative overflow-hidden">
+                                  <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
+                                  <h5 className="text-sm font-medium text-yellow-500 mb-1 pl-2">Uncoupling Trip</h5>
+                                  <p className="text-xs text-muted-foreground pl-2">
+                                    Special handling required as per field combination logic in Miro board.
+                                  </p>
+
+                                  <div className="mt-2 pt-2 border-t border-dashed pl-2">
+                                    <p className="text-xs font-medium">Field Combinations:</p>
+                                    <ul className="text-xs text-muted-foreground list-disc pl-4 mt-1">
+                                      <li>Uncoupling flag = True</li>
+                                      <li>Multiple drop locations</li>
+                                      <li>Special handling required</li>
+                                    </ul>
+                                  </div>
+                                </div>
+
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button className="w-full mt-4" variant="outline">
+                                      View Complete Field Logic
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+                                    <DialogHeader>
+                                      <DialogTitle>Trip Classification Field Logic</DialogTitle>
+                                      <DialogDescription>
+                                        Complete field combination logic as defined in MIRO board
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <div className="border rounded-md p-4">
+                                        <h3 className="text-sm font-medium mb-2">Regular Trip Logic</h3>
+                                        <p className="text-xs text-muted-foreground mb-2">
+                                          Regular trips are the standard trips that don't fall into any special
+                                          category.
+                                        </p>
+                                        <div className="bg-muted p-3 rounded text-xs font-mono">
+                                          <pre>
+                                            {`IF (trip.isUncoupling === false AND 
+    trip.distance >= 50km AND 
+    trip.dropLocations.length === 1 AND
+    !trip.requiresSpecialHandling) {
+    
+    THEN trip.classification = "REGULAR"
+}`}
+                                          </pre>
+                                        </div>
+                                      </div>
+
+                                      <div className="border rounded-md p-4">
+                                        <h3 className="text-sm font-medium mb-2">Short Trip Logic</h3>
+                                        <p className="text-xs text-muted-foreground mb-2">
+                                          Short trips are those with distance under threshold and same-day delivery.
+                                        </p>
+                                        <div className="bg-muted p-3 rounded text-xs font-mono">
+                                          <pre>
+                                            {`IF (trip.distance < 50km AND 
+    trip.dropLocations.length === 1 AND
+    trip.deliveryDate === trip.pickupDate) {
+    
+    THEN trip.classification = "SHORT"
+}`}
+                                          </pre>
+                                        </div>
+                                      </div>
+
+                                      <div className="border rounded-md p-4">
+                                        <h3 className="text-sm font-medium mb-2">Uncoupling Trip Logic</h3>
+                                        <p className="text-xs text-muted-foreground mb-2">
+                                          Uncoupling trips require special handling and might have multiple drop
+                                          locations.
+                                        </p>
+                                        <div className="bg-muted p-3 rounded text-xs font-mono">
+                                          <pre>
+                                            {`IF (trip.isUncoupling === true OR 
+    trip.dropLocations.length > 1 OR
+    trip.requiresSpecialHandling) {
+    
+    THEN trip.classification = "UNCOUPLING"
+}`}
+                                          </pre>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        {/* Brewery-wise Trip Classification Distribution */}
+                        <Card className="shadow-sm">
+                          <CardHeader>
+                            <CardTitle className="text-base font-medium">Brewery-wise Trip Classification</CardTitle>
+                            <CardDescription>Distribution of trip types across breweries</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="h-[300px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={breweryData.map((brewery) => ({
+                                    name: brewery.name,
+                                    Regular: brewery.tripTypes.regular,
+                                    Short: brewery.tripTypes.short,
+                                    Uncoupling: brewery.tripTypes.uncoupling
+                                  }))}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="name" />
+                                  <YAxis />
+                                  <Tooltip formatter={(value) => [`${value}%`, ""]} />
+                                  <Legend />
+                                  <Bar dataKey="Regular" name="Regular Trips" stackId="a" fill="#0088FE" />
+                                  <Bar dataKey="Short" name="Short Trips" stackId="a" fill="#00C49F" />
+                                  <Bar dataKey="Uncoupling" name="Uncoupling Trips" stackId="a" fill="#FFBB28" />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="flex justify-end pt-3 border-t">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Maximize2 className="h-4 w-4 mr-1" /> Detailed Breakdown
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
+                                <DialogHeader>
+                                  <DialogTitle>Brewery-wise Trip Classification Analysis</DialogTitle>
+                                  <DialogDescription>
+                                    Detailed breakdown of trip types by brewery with insights
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                                  <div>
+                                    <h3 className="text-sm font-medium mb-2">Trip Type Composition by Brewery (%)</h3>
+                                    <div className="h-[350px]">
+                                      <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                          data={breweryData.map((brewery) => ({
+                                            name: brewery.name,
+                                            Regular: brewery.tripTypes.regular,
+                                            Short: brewery.tripTypes.short,
+                                            Uncoupling: brewery.tripTypes.uncoupling
+                                          }))}
+                                          margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                                        >
+                                          <CartesianGrid strokeDasharray="3 3" />
+                                          <XAxis dataKey="name" />
+                                          <YAxis />
+                                          <Tooltip formatter={(value) => [`${value}%`, ""]} />
+                                          <Legend />
+                                          <Bar dataKey="Regular" name="Regular Trips" fill="#0088FE" />
+                                          <Bar dataKey="Short" name="Short Trips" fill="#00C49F" />
+                                          <Bar dataKey="Uncoupling" name="Uncoupling Trips" fill="#FFBB28" />
+                                        </BarChart>
+                                      </ResponsiveContainer>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <h3 className="text-sm font-medium mb-2">Trip Type Distribution Analysis</h3>
+                                    <div className="space-y-4">
+                                      {breweryData.map((brewery, index) => (
+                                        <div key={index} className="border rounded-md p-3">
+                                          <h4 className="text-sm font-medium">{brewery.name}</h4>
+                                          <div className="grid grid-cols-3 gap-2 mt-2">
+                                            <div className="border rounded p-2">
+                                              <div className="flex items-center">
+                                                <div className="w-3 h-3 rounded-full bg-[#0088FE] mr-2"></div>
+                                                <span className="text-xs font-medium">Regular</span>
+                                              </div>
+                                              <div className="text-xl font-bold mt-1">{brewery.tripTypes.regular}%</div>
+                                            </div>
+                                            <div className="border rounded p-2">
+                                              <div className="flex items-center">
+                                                <div className="w-3 h-3 rounded-full bg-[#00C49F] mr-2"></div>
+                                                <span className="text-xs font-medium">Short</span>
+                                              </div>
+                                              <div className="text-xl font-bold mt-1">{brewery.tripTypes.short}%</div>
+                                            </div>
+                                            <div className="border rounded p-2">
+                                              <div className="flex items-center">
+                                                <div className="w-3 h-3 rounded-full bg-[#FFBB28] mr-2"></div>
+                                                <span className="text-xs font-medium">Uncoupling</span>
+                                              </div>
+                                              <div className="text-xl font-bold mt-1">
+                                                {brewery.tripTypes.uncoupling}%
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                            <Button variant="outline" size="sm" className="ml-2">
+                              <ChevronRight className="h-4 w-4 mr-1" /> Export Chart
+                            </Button>
+                          </CardFooter>
+                        </Card>
+
+                        {/* Historical Trip Classification Trends */}
+                        <Card className="shadow-sm">
+                          <CardHeader>
+                            <CardTitle className="text-base font-medium">
+                              Historical Trip Classification Trends
+                            </CardTitle>
+                            <CardDescription>6-month trend analysis of trip types</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="h-[300px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                  data={tripClassificationTrends}
+                                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="month" />
+                                  <YAxis />
+                                  <Tooltip formatter={(value) => [`${value}%`, ""]} />
+                                  <Legend />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="Regular"
+                                    stroke="#0088FE"
+                                    strokeWidth={2}
+                                    activeDot={{ r: 8 }}
+                                  />
+                                  <Line type="monotone" dataKey="Short" stroke="#00C49F" strokeWidth={2} />
+                                  <Line type="monotone" dataKey="Uncoupling" stroke="#FFBB28" strokeWidth={2} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="flex items-center justify-between border rounded-md p-3">
+                                <div>
+                                  <div className="flex items-center">
+                                    <div className="w-3 h-3 rounded-full bg-[#0088FE] mr-2"></div>
+                                    <span className="text-sm font-medium">Regular Trips</span>
+                                  </div>
+                                  <div className="text-muted-foreground text-xs mt-1">6-Month Trend</div>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="text-lg font-bold">+15%</span>
+                                  <TrendingUp className="h-4 w-4 ml-1 text-green-500" />
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between border rounded-md p-3">
+                                <div>
+                                  <div className="flex items-center">
+                                    <div className="w-3 h-3 rounded-full bg-[#00C49F] mr-2"></div>
+                                    <span className="text-sm font-medium">Short Trips</span>
+                                  </div>
+                                  <div className="text-muted-foreground text-xs mt-1">6-Month Trend</div>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="text-lg font-bold">-10%</span>
+                                  <ArrowDown className="h-4 w-4 ml-1 text-red-500" />
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between border rounded-md p-3">
+                                <div>
+                                  <div className="flex items-center">
+                                    <div className="w-3 h-3 rounded-full bg-[#FFBB28] mr-2"></div>
+                                    <span className="text-sm font-medium">Uncoupling Trips</span>
+                                  </div>
+                                  <div className="text-muted-foreground text-xs mt-1">6-Month Trend</div>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="text-lg font-bold">-5%</span>
+                                  <ArrowDown className="h-4 w-4 ml-1 text-amber-500" />
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* History & Tracking Tab */}
+                      <TabsContent value="tracking" className="space-y-6">
+                        {/* Search and Filter Controls */}
+                        <Card className="shadow-sm">
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col md:flex-row md:items-center gap-4">
+                              <div className="relative flex-1">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Search load plans, carriers, etc." className="pl-10" />
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Select defaultValue="all">
+                                  <SelectTrigger className="w-[150px] h-10">
+                                    <SelectValue placeholder="Status" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="in-transit">In Transit</SelectItem>
+                                    <SelectItem value="delivered">Delivered</SelectItem>
+                                    <SelectItem value="delayed">Delayed</SelectItem>
+                                    <SelectItem value="rejected">Rejected</SelectItem>
+                                  </SelectContent>
+                                </Select>
+
+                                <Select defaultValue="week">
+                                  <SelectTrigger className="w-[150px] h-10">
+                                    <SelectValue placeholder="Date Range" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="today">Today</SelectItem>
+                                    <SelectItem value="yesterday">Yesterday</SelectItem>
+                                    <SelectItem value="week">This Week</SelectItem>
+                                    <SelectItem value="month">This Month</SelectItem>
+                                    <SelectItem value="custom">Custom Range</SelectItem>
+                                  </SelectContent>
+                                </Select>
+
+                                <Button variant="outline" size="icon" className="h-10 w-10">
+                                  <Filter className="h-4 w-4" />
+                                </Button>
+
+                                <Button variant="default" className="h-10">
+                                  <Search className="h-4 w-4 mr-2" />
+                                  Search
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>{" "}
+                        {/* Recent Tracked Load Plans */}
+                        <Card className="shadow-sm">
+                          <CardHeader>
+                            <CardTitle className="text-base font-medium">Recent Load Plans</CardTitle>
+                            <CardDescription>Track and monitor your load plans</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>ID</TableHead>
+                                  <TableHead>Origin</TableHead>
+                                  <TableHead>Destination</TableHead>
+                                  <TableHead>Carrier</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>ETA</TableHead>
+                                  <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell className="font-medium">LP-2025-7854</TableCell>
+                                  <TableCell>Brewery A</TableCell>
+                                  <TableCell>Distribution Center B</TableCell>
+                                  <TableCell>TransCorp</TableCell>
+                                  <TableCell>
+                                    <Badge className="bg-blue-500">In Transit</Badge>
+                                  </TableCell>
+                                  <TableCell>July 29, 6:15 PM</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm">
+                                      <Search className="h-3.5 w-3.5 mr-1" />
+                                      Track
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">LP-2025-7853</TableCell>
+                                  <TableCell>Brewery B</TableCell>
+                                  <TableCell>Distribution Center A</TableCell>
+                                  <TableCell>FastFreight</TableCell>
+                                  <TableCell>
+                                    <Badge className="bg-green-500">Delivered</Badge>
+                                  </TableCell>
+                                  <TableCell>July 29, 2:30 PM</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm">
+                                      <Search className="h-3.5 w-3.5 mr-1" />
+                                      Details
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">LP-2025-7852</TableCell>
+                                  <TableCell>Brewery C</TableCell>
+                                  <TableCell>Distribution Center D</TableCell>
+                                  <TableCell>QuickHaul</TableCell>
+                                  <TableCell>
+                                    <Badge variant="destructive">Delayed</Badge>
+                                  </TableCell>
+                                  <TableCell>July 29, 5:45 PM</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm">
+                                      <Search className="h-3.5 w-3.5 mr-1" />
+                                      Track
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">LP-2025-7851</TableCell>
+                                  <TableCell>Brewery A</TableCell>
+                                  <TableCell>Distribution Center C</TableCell>
+                                  <TableCell>TransCorp</TableCell>
+                                  <TableCell>
+                                    <Badge className="bg-amber-500">Loading</Badge>
+                                  </TableCell>
+                                  <TableCell>July 29, 7:00 PM</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm">
+                                      <Search className="h-3.5 w-3.5 mr-1" />
+                                      Track
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">LP-2025-7850</TableCell>
+                                  <TableCell>Brewery B</TableCell>
+                                  <TableCell>Distribution Center B</TableCell>
+                                  <TableCell>FastFreight</TableCell>
+                                  <TableCell>
+                                    <Badge className="bg-purple-500">Scheduled</Badge>
+                                  </TableCell>
+                                  <TableCell>July 30, 10:30 AM</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm">
+                                      <Search className="h-3.5 w-3.5 mr-1" />
+                                      Details
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </CardContent>
+                          <CardFooter className="border-t pt-4 flex justify-between">
+                            <p className="text-sm text-muted-foreground">Showing 5 of 240 load plans</p>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm">
+                                Previous
+                              </Button>
+                              <Button variant="outline" size="sm">
+                                Next
+                              </Button>
+                            </div>
+                          </CardFooter>
+                        </Card>
+                        {/* Trip Tracking Timeline */}
+                        <Card className="shadow-sm">
+                          <CardHeader>
+                            <CardTitle className="text-base font-medium">Load Plan Journey Timeline</CardTitle>
+                            <CardDescription>Complete history from creation to delivery</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex flex-col md:flex-row gap-6">
+                              <div className="md:w-1/3">
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <h3 className="text-sm font-medium">Load Plan ID</h3>
+                                    <Badge variant="outline">LP-2025-7854</Badge>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Origin</span>
+                                      <span className="text-sm font-medium">Brewery A</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Destination</span>
+                                      <span className="text-sm font-medium">Distribution Center B</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Carrier</span>
+                                      <span className="text-sm font-medium">TransCorp Logistics</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Vehicle Plate</span>
+                                      <span className="text-sm font-medium">XYZ-1234</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Trip Type</span>
+                                      <Badge>Regular</Badge>
+                                    </div>
+                                  </div>
+
+                                  <Separator />
+
+                                  <div className="space-y-2">
+                                    <h3 className="text-sm font-medium">Current Status</h3>
+                                    <div className="flex items-center gap-2 text-green-600">
+                                      <Radio className="h-4 w-4" />
+                                      <span className="font-medium">In Transit</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Estimated arrival in 2 hours 30 minutes
+                                    </p>
+                                  </div>
+
+                                  <div className="flex flex-col gap-2 mt-4">
+                                    <Button>
+                                      <Search className="h-4 w-4 mr-2" />
+                                      View Detailed Map
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="md:w-2/3 border-l pl-6">
+                                <div className="space-y-8">
+                                  {/* Timeline steps */}
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-0 left-3 h-full w-0.5 bg-gray-200"></div>
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-green-100">
+                                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between">
+                                        <h4 className="font-medium">Load Plan Created</h4>
+                                        <span className="text-xs text-muted-foreground">July 29, 10:15 AM</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Load plan created in SAP and synced to DeltaX platform
+                                      </p>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge variant="outline">SAP ID: S12345</Badge>
+                                        <Badge variant="outline">Auto-sync</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-0 left-3 h-full w-0.5 bg-gray-200"></div>
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-green-100">
+                                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between">
+                                        <h4 className="font-medium">Carrier Assigned</h4>
+                                        <span className="text-xs text-muted-foreground">July 29, 11:30 AM</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        TransCorp Logistics assigned to the load plan
+                                      </p>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge variant="outline">Auto-assignment</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-0 left-3 h-full w-0.5 bg-gray-200"></div>
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-green-100">
+                                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between">
+                                        <h4 className="font-medium">Carrier Accepted</h4>
+                                        <span className="text-xs text-muted-foreground">July 29, 12:05 PM</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        TransCorp Logistics accepted the load plan
+                                      </p>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge variant="outline">Response time: 35 min</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-0 left-3 h-full w-0.5 bg-gray-200"></div>
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-green-100">
+                                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between">
+                                        <h4 className="font-medium">Vehicle Assigned</h4>
+                                        <span className="text-xs text-muted-foreground">July 29, 1:40 PM</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Vehicle with plate XYZ-1234 assigned to the load plan
+                                      </p>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge variant="outline">Driver: John Smith</Badge>
+                                        <Badge variant="outline">Trailer: T-5678</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-0 left-3 h-full w-0.5 bg-gray-200"></div>
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-green-100">
+                                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between">
+                                        <h4 className="font-medium">Gate Check-In</h4>
+                                        <span className="text-xs text-muted-foreground">July 29, 2:30 PM</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Vehicle arrived at origin and checked in at gate
+                                      </p>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge variant="outline">On time</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-0 left-3 h-full w-0.5 bg-gray-200"></div>
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-green-100">
+                                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between">
+                                        <h4 className="font-medium">Loading Complete</h4>
+                                        <span className="text-xs text-muted-foreground">July 29, 3:15 PM</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Loading completed at origin facility
+                                      </p>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge variant="outline">30 pallets</Badge>
+                                        <Badge variant="outline">Weight: 18,500 kg</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-0 left-3 h-full w-0.5 bg-gray-200"></div>
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-blue-100">
+                                      <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between items-center">
+                                        <h4 className="font-medium flex items-center">
+                                          In Transit
+                                          <Badge className="ml-2 bg-blue-500" variant="secondary">
+                                            Current
+                                          </Badge>
+                                        </h4>
+                                        <span className="text-xs text-muted-foreground">July 29, 3:45 PM</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Vehicle has departed from origin and is en route to destination
+                                      </p>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge variant="outline">ETA: 6:15 PM</Badge>
+                                        <Badge variant="outline">Distance: 154 km</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="relative pl-8 pt-1">
+                                    <div className="absolute top-1 left-0 p-1.5 rounded-full bg-gray-100">
+                                      <div className="h-3 w-3 rounded-full bg-gray-400"></div>
+                                    </div>
+                                    <div>
+                                      <div className="flex justify-between">
+                                        <h4 className="font-medium text-muted-foreground">Arrival at Destination</h4>
+                                        <span className="text-xs text-muted-foreground">Pending</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">Estimated arrival at 6:15 PM</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="border-t pt-4 flex justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center">
+                                <div className="h-3 w-3 rounded-full bg-green-500 mr-1"></div>
+                                <span className="text-xs text-muted-foreground">Completed</span>
+                              </div>
+                              <div className="flex items-center">
+                                <div className="h-3 w-3 rounded-full bg-blue-500 mr-1"></div>
+                                <span className="text-xs text-muted-foreground">Current</span>
+                              </div>
+                              <div className="flex items-center">
+                                <div className="h-3 w-3 rounded-full bg-gray-400 mr-1"></div>
+                                <span className="text-xs text-muted-foreground">Pending</span>
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm">
+                              Export Timeline
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Appointment Confirmation KPIs */}
+                      <TabsContent value="appointment" className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Accepted Folios Without Plate Assigned */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">
+                                Accepted Folios Without Plate Assigned
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex flex-col items-center justify-center h-[200px]">
+                                <div className="text-4xl font-bold">{appointmentKPIs.withoutPlate}</div>
+                                <div className="text-lg font-semibold text-muted-foreground mt-1">
+                                  {appointmentKPIs.withoutPlatePercentage}%
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-2">
+                                  Out of {appointmentKPIs.acceptedFolios} accepted folios
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Critical KPIs */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">Critical KPIs</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm">Pending Plate &lt;2hrs</span>
+                                  <Badge variant="destructive">{appointmentKPIs.pendingPlate2Hrs}</Badge>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm">Escalations Triggered</span>
+                                  <Badge variant="outline">{appointmentKPIs.escalations}</Badge>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm">Auto Reschedules</span>
+                                  <Badge variant="secondary">{appointmentKPIs.autoReschedules}</Badge>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm">Unassignment Events</span>
+                                  <Badge variant="outline">{appointmentKPIs.unassignmentEvents}</Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* ETA Breaches */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">ETA Breaches (on-time vs delayed)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={etaBreachData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="value" fill="#8884d8">
+                                      {etaBreachData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Bar>
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Carrier Response Rate */}
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-sm font-medium">Carrier Response Rate</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={carrierResponseData}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={40}
+                                      outerRadius={60}
+                                      fill="#8884d8"
+                                      dataKey="value"
+                                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                      {carrierResponseData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+
+                    {/* KPI Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4 mt-6">
+                      <StatCard
+                        title="Folios Updated in DeltaX"
+                        value={planningKPIs.folioPercentage}
+                        trend={planningKPIs.folioPercentage > 80 ? "up" : "down"}
+                        percent={true}
+                        description={`${planningKPIs.foliosInDeltaX} out of ${planningKPIs.totalFolios}`}
+                        icon={RefreshCw}
+                      />
+                      <StatCard
+                        title="SAP vs DeltaX Mismatches"
+                        value={planningKPIs.sapDeltaxMismatches}
+                        trend="down"
+                        percent={false}
+                        description="Critical - Requires Reconciliation"
+                        icon={AlertOctagon}
+                      />
+                      <StatCard
+                        title="Folios Accepted"
+                        value={planningKPIs.foliosAcceptedBefore6PM}
+                        trend="down"
+                        percent={false}
+                        description="Before 6 PM Cutoff"
+                        icon={Check}
+                      />
+                      <StatCard
+                        title="Folios Rejected After 4PM"
+                        value={planningKPIs.foliosRejectedAfter4PM}
+                        trend="down"
+                        percent={false}
+                        description="Auto Reassignment Required"
+                        icon={X}
+                      />
+                      <StatCard
+                        title="Reminder & Escalations"
+                        value={planningKPIs.remindersTriggered}
+                        trend="up"
+                        percent={false}
+                        description={`${planningKPIs.escalationsTriggered} Escalations Triggered`}
+                        icon={Bell}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right sidebar (25%) */}
+                  <div className="space-y-6">
+                    {/* Timeline Progress Card */}
+                    <Card className="mb-6 overflow-hidden border shadow-sm">
+                      <CardHeader className="pb-2 bg-gradient-to-r from-background to-muted/30">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base font-medium">Planning Timeline & Status</CardTitle>
+                          <Badge variant="outline">{planningKPIs.folioPercentage}% Complete</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-4 pb-2">
+                        <div className="relative">
+                          <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-100 via-blue-500 to-blue-100"></div>
+                          <div className="flex flex-col space-y-6">
+                            {planningTimeline.map((item, index) => (
+                              <div key={index} className="relative pl-10 flex items-start">
+                                <div
+                                  className={`absolute left-0.5 top-1 w-5 h-5 rounded-full border-2 ${
+                                    index < 3 ? "border-green-500 bg-green-100" : "border-blue-500 bg-white"
+                                  }`}
+                                ></div>
+                                <div className="flex flex-col">
+                                  <p className="text-xs font-medium text-muted-foreground">{item.time}</p>
+                                  <p className="text-sm font-medium">{item.status}</p>
+                                  <div className="flex items-center mt-1">
+                                    <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-full">
+                                      {item.count}
+                                    </span>
+                                    {item.status === "SAP-DeltaX Reconciliation" && (
+                                      <Badge variant="destructive" className="ml-1 h-5 text-[10px]">
+                                        {planningKPIs.sapDeltaxMismatches}
+                                      </Badge>
+                                    )}
+                                    {item.status === "Carrier Acceptance Period" && (
+                                      <Badge variant="secondary" className="ml-1 h-5 text-[10px]">
+                                        {planningKPIs.remindersTriggered}
+                                      </Badge>
+                                    )}
+                                    {item.status === "Escalations for Non-Response" && (
+                                      <Badge variant="destructive" className="ml-1 h-5 text-[10px]">
+                                        {planningKPIs.escalationsTriggered}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Real-Time Alerts Panel - Modernized */}
+                    <Card className="border bg-gradient-to-b from-background to-muted/30 shadow-sm overflow-hidden">
+                      <CardHeader className="flex flex-row items-center justify-between pb-2 bg-muted/30">
+                        <CardTitle className="text-sm font-medium">Real-Time Alerts</CardTitle>
+                        <Sheet>
+                          <SheetTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Bell className="h-4 w-4" />
+                            </Button>
+                          </SheetTrigger>
+                          <SheetContent>
+                            <SheetHeader>
+                              <SheetTitle>Real-Time Alerts</SheetTitle>
+                            </SheetHeader>
+                            <div className="mt-6 space-y-4">
+                              {alertsData.map((alert) => (
+                                <AlertItem key={alert.id} type={alert.type} message={alert.message} time={alert.time} />
+                              ))}
+                            </div>
+                          </SheetContent>
+                        </Sheet>
+                      </CardHeader>
+                      <CardContent className="pt-3">
+                        <div className="space-y-3 max-h-[340px] overflow-auto">
+                          {alertsData.slice(0, 3).map((alert) => (
+                            <AlertItem key={alert.id} type={alert.type} message={alert.message} time={alert.time} />
+                          ))}
+                          {alertsData.length > 3 && (
+                            <div className="text-center pt-2">
+                              <Sheet>
+                                <SheetTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-xs">
+                                    Show {alertsData.length - 3} more alerts
+                                  </Button>
+                                </SheetTrigger>
+                                <SheetContent>
+                                  <SheetHeader>
+                                    <SheetTitle>Real-Time Alerts</SheetTitle>
+                                  </SheetHeader>
+                                  <div className="mt-6 space-y-4">
+                                    {alertsData.map((alert) => (
+                                      <AlertItem
+                                        key={alert.id}
+                                        type={alert.type}
+                                        message={alert.message}
+                                        time={alert.time}
+                                      />
+                                    ))}
+                                  </div>
+                                </SheetContent>
+                              </Sheet>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+                {/* Brewery-Wise Table */}
+                <Card className="shadow-sm mt-6">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm font-medium">Brewery-Wise Load Plan Status</CardTitle>
+                    <Badge variant="outline">Sorted by Rejection Rate</Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Brewery</TableHead>
+                          <TableHead>Accepted Load Plans</TableHead>
+                          <TableHead>Rejections</TableHead>
+                          <TableHead>Adjusted Plans</TableHead>
+                          <TableHead>Auto Reassigned</TableHead>
+                          <TableHead>Trip Types</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {breweryData.map((brewery, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{brewery.name}</TableCell>
+                            <TableCell>{brewery.accepted}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <span className="mr-2">{brewery.rejected.before4PM + brewery.rejected.after4PM}</span>
+                                <Badge variant="outline">
+                                  <span className="text-xs text-gray-500 mr-1">Before 4PM:</span>
+                                  {brewery.rejected.before4PM}
+                                </Badge>
+                                <Badge variant="destructive" className="ml-1">
+                                  <span className="text-xs mr-1">After 4PM:</span>
+                                  {brewery.rejected.after4PM}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <Badge variant="secondary" className="mr-1">
+                                  B: {brewery.adjusted.before4PM}
+                                </Badge>
+                                <Badge variant="secondary">A: {brewery.adjusted.after4PM}</Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{brewery.autoReassigned}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-1">
+                                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                <span className="text-xs">{brewery.tripTypes.regular}%</span>
+                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                <span className="text-xs">{brewery.tripTypes.short}%</span>
+                                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                                <span className="text-xs">{brewery.tripTypes.uncoupling}%</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
